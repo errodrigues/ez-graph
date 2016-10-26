@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Queue;
 import java.util.Set;
 import java.util.SortedSet;
@@ -51,41 +52,39 @@ import java.util.stream.Collectors;
 
 /**
  * <p>This class implements a dependency graph using a strongly connected
- * Directed Acyclic Graph (DAG) and allows sorting of its nodes in
+ * Directed Acyclic Graph (DAG) and allows sorting of its snapshotNodes in
  * topological order.</p>
  *
  * <p>Some important characteristics of this class are:</p>
  * <ol><li>The graph fully implements the {@link Collection} interface</li>
  * <li>Calling {@link #getTopology} will not destroy the graph: the same graph instance can be safely reused after a topological sort operation.</li>
  * <li>It can optionally be instantiated to be thread-safe (see {@link #DependencyGraph(boolean)}) adding some overhead due to use of {@link ReentrantReadWriteLock}s</li>
- * <li>It is capable of detecting cycles (or circular dependencies paths) and for each cycle list all participant nodes (see {@link #findCycles})</li></ol>
+ * <li>It is capable of detecting cycles (or circular dependencies paths) and for each cycle list all participant snapshotNodes (see {@link #findCycles})</li></ol>
  *
- * @param <T> The content type for the graph
- * @author Eduardo Rodrigues (https://github.com/errodrigues/ez-graph)
+ * @param <T> The nodeContent type for the graph
  */
-//TODO: implement new method iteratePathsBetween(a, b) returning a standard Iterator where each next entry will be a Collection representing one valid path between nodes a and b
+@SuppressWarnings("unused")
+//TODO: implement new method iteratePathsBetween(a, b) returning a standard Iterator where each next entry will be a Collection representing one valid path between Nodes a and b
 public final class DependencyGraph<T> implements Collection<T> {
-	private static final Predicate<Object> IS_NULL = o -> o == null;
-
-	// stores all nodes in the graph
+	// stores all snapshotNodes in the graph
 	private final Map<T, Node<T>> nodes = new HashMap<>();
 
-	// stores only those nodes that do not have any incoming connections from
-	// other nodes.
+	// stores only those snapshotNodes that do not have any incoming connections from
+	// other snapshotNodes.
 	private final Set<Node<T>> vertices = new HashSet<>();
 
-	// stores only those nodes that do not have any outgoing connections to
-	// other nodes.
+	// stores only those snapshotNodes that do not have any outgoing connections to
+	// other snapshotNodes.
 	private final Set<Node<T>> dependentFree = new HashSet<>();
 
-	// stores only those nodes that do have at least 1 outgoing AND 1 incoming connection to/from
-	// other nodes.
+	// stores only those snapshotNodes that do have at least 1 outgoing AND 1 incoming connection to/from
+	// other snapshotNodes.
 	private final Set<Node<T>> bidirectionalNodes = new HashSet<>();
 
-	// keeps count of the total number of edges (or connections), in or outbound
+	// keeps count of the total number of snapshotEdges (or connections), in or outbound
 	private final AtomicInteger edges = new AtomicInteger(0);
 
-	// sequence number used when creating new nodes
+	// nodeSequence number used when creating new snapshotNodes
 	private final AtomicInteger sequence = new AtomicInteger(0);
 	private final AtomicLong version = new AtomicLong(0L);
 
@@ -201,7 +200,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 	}
 
-	/** @return New node with the given content */
+	/** @return New node with the given nodeContent */
 	private Node<T> createNode(final T content) {
 		return new Node<>(content, sequence.getAndIncrement());
 	}
@@ -211,22 +210,22 @@ public final class DependencyGraph<T> implements Collection<T> {
 		return nodes.size();
 	}
 
-	/** Extracts the actual content from each Node in the given collection and collects the extracted content in another collection */
+	/** Extracts the actual nodeContent from each Node in the given collection and collects the extracted nodeContent in another collection */
 	private Collection<T> extractContent(final Collection<Node<T>> collection) {
-		return collection.stream().map(node -> node.content).collect(Collectors.toList());
+		return collection.stream().map(node -> node.nodeContent).collect(Collectors.toList());
 	}
 
 	/**
-	 * Identifies all the nodes that no other nodes depend on
-	 * @return Collection of nodes that no other nodes depend on
+	 * Identifies all the snapshotNodes that no other snapshotNodes depend on
+	 * @return Collection of snapshotNodes that no other snapshotNodes depend on
 	 */
 	public Collection<T> getDependentFreeNodes() {
 		return extractContent(dependentFree);
 	}
 
 	/**
-	 * Identifies all the nodes that do not depend on any other node
-	 * @return Collection of nodes that do not depend on any other node
+	 * Identifies all the snapshotNodes that do not depend on any other node
+	 * @return Collection of snapshotNodes that do not depend on any other node
 	 */
 	public Collection<T> getIndependentNodes() {
 		return extractContent(vertices);
@@ -234,9 +233,9 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 	/**
 	 * Add a node to the graph if and only if it is not already present in the graph, otherwise
-	 * the content will be added again as a new graph node.
+	 * the nodeContent will be added again as a new graph node.
 	 *
-	 * @param content content to be added as a new node to the graph
+	 * @param content nodeContent to be added as a new node to the graph
 	 */
 	private boolean addNodeIfAbsent(final T content) {
 		final Node<T> node = mutateSafely(() -> {
@@ -260,17 +259,17 @@ public final class DependencyGraph<T> implements Collection<T> {
 	private void initializeFor(final Node<T> node) {
 		vertices.add(node);
 		assert nodes.size() >= vertices.size() :
-				"The number of sortedVertices should never be greater than total number of nodes";
+				"The number of sortedVertices should never be greater than total number of snapshotNodes";
 
 		dependentFree.add(node);
 		assert nodes.size() >= dependentFree.size() :
-				"The number of dependent-free nodes should never be greater than total number of nodes";
+				"The number of dependent-free snapshotNodes should never be greater than total number of snapshotNodes";
 	}
 
 	/**
-	 * Add new content to the graph, wrapped in a Node instance
-	 * @param content content to be added as a new node to the graph
-	 * @return new Node wrapping the added content
+	 * Add new nodeContent to the graph, wrapped in a Node instance
+	 * @param content nodeContent to be added as a new node to the graph
+	 * @return new Node wrapping the added nodeContent
 	 */
 	private Node<T> addNode(final T content) {
 		final Node<T> node = createNode(content);
@@ -280,9 +279,9 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * Add content to the graph as a new node only if the graph does not contain it yet.
-	 * @param content non-null content to be added to the graph
-	 * @throws NullPointerException if the given content is null
+	 * Add nodeContent to the graph as a new node only if the graph does not contain it yet.
+	 * @param content non-null nodeContent to be added to the graph
+	 * @throws NullPointerException if the given nodeContent is null
 	 */
 	@Override
 	public boolean add(final T content) {
@@ -292,8 +291,8 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 	private void ensureContentNotNull(final Object... args) {
 		for (final Object arg : args) {
-			if (arg == null || arg instanceof Collection && ((Collection<?>) arg).stream().anyMatch(IS_NULL)) {
-				throw new NullPointerException("Null content is not allowed");
+			if (arg == null || arg instanceof Collection && ((Collection<?>) arg).stream().anyMatch(Objects::isNull)) {
+				throw new NullPointerException("Null nodeContent is not allowed");
 			}
 		}
 	}
@@ -301,19 +300,19 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Adds 1 or more dependencies to the given dependent node.</p>
 	 *
-	 * <p>If the dependent content or any of the given dependencies don't exist
-	 * as nodes in the graph, new nodes will automatically be created and added
+	 * <p>If the dependent nodeContent or any of the given dependencies don't exist
+	 * as snapshotNodes in the graph, new snapshotNodes will automatically be created and added
 	 * first.</p>
 	 *
 	 * <p>Because this is a strongly connected digraph,
-	 * each new dependency will represent 2 new edges (or connections)
-	 * between 2 nodes (dependent and dependency). For example, if A depends on B
+	 * each new dependency will represent 2 new snapshotEdges (or connections)
+	 * between 2 snapshotNodes (dependent and dependency). For example, if A depends on B
 	 * then B will have an outgoing connection to A as well as  A will have an
 	 * incoming connection from B.</p>
 	 *
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies collection
-	 * @param dependencies All nodes that dependent depends on
+	 * @param dependencies All snapshotNodes that dependent depends on
 	 * @throws NullPointerException if any of the arguments or any of the elements in &quot;dependencies&quot; is null
 	 */
 	public void addDependencies(final T dependent, final Collection<T> dependencies)
@@ -331,7 +330,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 				hasIncoming = to.hasIncoming();
 				if (to.hasOutgoing() && !hasIncoming && !dependencies.isEmpty()) {
 					final boolean added = bidirectionalNodes.add(to);
-					assert added : dependent + " has outgoing but not incoming connections, hence it should NOT have been found in internal bidirectionalNodes set.";
+					assert added : dependent + " has outgoing but not incoming connections, hence it should NOT have been found in internal snapshotBidiNodes set.";
 				}
 			}
 
@@ -342,7 +341,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 					modified = true;
 				} else if (!from.hasOutgoing()) {
 					final boolean removed = dependentFree.remove(from);
-					assert removed : dep + " has no outgoing connections, hence it should have been found in internal dependentFree set.";
+					assert removed : dep + " has no outgoing connections, hence it should have been found in internal snapshotDependentFree set.";
 				}
 
 				if (!hasIncoming) {
@@ -380,7 +379,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Convenience method equivalent to {@link #addConnections(Object, Collection)}</p>
 	 * @param from The node that will be connected to each node provided in the given collection
-	 * @param to All nodes that <strong>from</strong> will connect to
+	 * @param to All snapshotNodes that <strong>from</strong> will connect to
 	 * @throws NullPointerException if &quot;from&quot; or any of the elements in &quot;to&quot; is null
 	 */
 	@SafeVarargs
@@ -392,15 +391,15 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * <p>Adds 1 or more connections from the given node.</p>
 	 *
 	 * <p>If the origin node or any of its given connections don't exist
-	 * as nodes in the graph, new nodes will automatically be created and added
+	 * as snapshotNodes in the graph, new snapshotNodes will automatically be created and added
 	 * first.</p>
 	 *
-	 * <p>Because this is a strongly connected digraph, each new connection will incur 2 new edges between both nodes
+	 * <p>Because this is a strongly connected digraph, each new connection will incur 2 new snapshotEdges between both snapshotNodes
 	 * being connected. For example, if A connects to B then A will have an outgoing connection to A as well as A will
 	 * have an incoming connection from B.</p>
 	 *
 	 * @param from The node that will be connected to each node provided in the given collection
-	 * @param to All nodes that <strong>from</strong> will connect to
+	 * @param to All snapshotNodes that <strong>from</strong> will connect to
 	 * @throws NullPointerException if any of the arguments or any of the elements in &quot;to&quot; is null
 	 */
 	public void addConnections(final T from, final Collection<T> to) {
@@ -417,7 +416,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 				hasOutgoing = fromNode.hasOutgoing();
 				if (fromNode.hasIncoming() && !hasOutgoing && !to.isEmpty()) {
 					final boolean added = bidirectionalNodes.add(fromNode);
-					assert added : from + " has incoming but not outgoing connections, hence it should NOT have been found in internal bidirectionalNodes set.";
+					assert added : from + " has incoming but not outgoing connections, hence it should NOT have been found in internal snapshotBidiNodes set.";
 				}
 			}
 
@@ -435,7 +434,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 				if (!hasOutgoing) {
 					final boolean removed = dependentFree.remove(fromNode);
-					assert removed : from + " has no outgoing connections, hence it should have been found in internal dependentFree set.";
+					assert removed : from + " has no outgoing connections, hence it should have been found in internal snapshotDependentFree set.";
 					hasOutgoing = true;
 				}
 
@@ -469,7 +468,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * <p>Convenience method, equivalent to {@link #addDependencies(Object, Collection)}</p>
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies array
-	 * @param dependencies Optional list of nodes that dependent depends on
+	 * @param dependencies Optional list of snapshotNodes that dependent depends on
 	 * @throws NullPointerException if &quot;dependent&quot; or any of the elements in &quot;dependencies&quot; is null
 	 */
 	@SafeVarargs
@@ -481,7 +480,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Convenience method, equivalent to {@link #removeDependencies(Object, Collection)}
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies array
-	 * @param dependencies All nodes that should be removed as dependencies of
+	 * @param dependencies All snapshotNodes that should be removed as dependencies of
 	 * the dependent node
 	 */
 	@SafeVarargs
@@ -493,7 +492,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Removes 1 or more dependencies from the given dependent node.</p>
 	 *
-	 * <p>Including nodes in the dependencies collection that are not connected to
+	 * <p>Including snapshotNodes in the dependencies collection that are not connected to
 	 * the dependent node won't have any effect.</p>
 	 *
 	 * <p>See method {@link #addDependencies(Object dependent, Collection)} for more details on some dependency
@@ -501,7 +500,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 *
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies array
-	 * @param dependencies All nodes that should be removed as dependencies of
+	 * @param dependencies All snapshotNodes that should be removed as dependencies of
 	 * the dependent node
 	 */
 	public void removeDependencies(final T dependent, final Collection<T> dependencies) {
@@ -545,7 +544,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Convenience method, equivalent to {@link #removeConnections(Object, Collection)}
 	 * @param from The node that connects to each node provided in the
 	 * &quot;to&quot; array
-	 * @param to All nodes that should be disconnected
+	 * @param to All snapshotNodes that should be disconnected
 	 */
 	@SafeVarargs
 	public final void removeConnections(final T from, final T... to) {
@@ -556,14 +555,14 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Removes 1 or more connections from the given &quot;from&quot; node.</p>
 	 *
-	 * <p>Including nodes in the &quot;to&quot; collection that are not connected to
+	 * <p>Including snapshotNodes in the &quot;to&quot; collection that are not connected to
 	 * the &quot;from&quot; node won't have any effect.</p>
 	 *
 	 * <p>See method {@link #addConnections(Object, Collection)} for more details.</p>
 	 *
 	 * @param from The node that connects to each node provided in the
 	 * &quot;to&quot; array
-	 * @param to All nodes that should be disconnected
+	 * @param to All snapshotNodes that should be disconnected
 	 */
 	public void removeConnections(final T from, final Collection<T> to) {
 		ensureContentNotNull(from, to);
@@ -603,11 +602,11 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * <p>Will remove the node containing the given content, if it exists in the graph.
-	 * As a result, all edges directly connecting this node to other nodes will
+	 * <p>Will remove the node containing the given nodeContent, if it exists in the graph.
+	 * As a result, all snapshotEdges directly connecting this node to other snapshotNodes will
 	 * also be removed.</p>
 	 *
-	 * @param object The content to be removed from the graph
+	 * @param object The nodeContent to be removed from the graph
 	 */
 	@Override
 	public boolean remove(final Object object) {
@@ -647,21 +646,22 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * <p>Check if a given content exists in the graph</p>
+	 * <p>Check if a given nodeContent exists in the graph</p>
 	 *
 	 * @param content Content to be verified
-	 * @return true only if the given content exists in the graph
+	 * @return true only if the given nodeContent exists in the graph
 	 */
+	@Override
 	public boolean contains(final Object content) {
 		ensureContentNotNull(content);
 		return readSafely(() -> nodes.containsKey(content));
 	}
 
 	/**
-	 * Retrieves the contents of all nodes that the given content directly depends on.
+	 * Retrieves the contents of all snapshotNodes that the given nodeContent directly depends on.
 	 *
 	 * @param content The node to retrieve all direct dependencies from
-	 * @return A collection containing all direct dependencies for the given content.
+	 * @return A collection containing all direct dependencies for the given nodeContent.
 	 * If there aren't any, the collection will be empty.
 	 */
 	public Collection<T> getDirectDependencies(final T content) {
@@ -675,11 +675,11 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * Retrieves the contents of all nodes that the given content is a direct
+	 * Retrieves the contents of all snapshotNodes that the given nodeContent is a direct
 	 * dependency of.
 	 *
 	 * @param content The node to retrieve all direct dependents from
-	 * @return A collection containing all direct dependents of the given content.
+	 * @return A collection containing all direct dependents of the given nodeContent.
 	 * If there aren't any, the collection will be empty.
 	 */
 	public Collection<T> getDirectDependents(final T content) {
@@ -689,7 +689,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		});
 	}
 
-	/** Helper class specialized in find paths between nodes in the graph */
+	/** Helper class specialized in find paths between snapshotNodes in the graph */
 	private final class PathFinder {
 		private Snapshot snapshot = new Snapshot();
 
@@ -697,12 +697,12 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		private void searchDepthFirst(final Node<T> node, final T target, final Deque<T> currentPath) {
-			currentPath.add(node.content);
-			if (node.content.equals(target)) {
+			currentPath.add(node.nodeContent);
+			if (node.nodeContent.equals(target)) {
 				return;
 			}
 			for (final Node<T> next : snapshot.getAdjacentNodes(node)) {
-				if (!currentPath.contains(next.content)) {
+				if (!currentPath.contains(next.nodeContent)) {
 					searchDepthFirst(next, target, currentPath);
 					if (target.equals(currentPath.peekLast())) {
 						return;
@@ -716,10 +716,10 @@ public final class DependencyGraph<T> implements Collection<T> {
 			final Deque<T> shortestPath = new ArrayDeque<>();
 			final Queue<Node<T>> queue = new ArrayDeque<>();
 			for (Node<T> next = node; next != null; next = queue.poll()) {
-				shortestPath.add(next.content);
+				shortestPath.add(next.nodeContent);
 				for (final Node<T> n : snapshot.getAdjacentNodes(next)) {
-					if (n.content.equals(target)) {
-						shortestPath.add(n.content);
+					if (n.nodeContent.equals(target)) {
+						shortestPath.add(n.nodeContent);
 						return shortestPath;
 					}
 					queue.offer(n);
@@ -733,7 +733,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		private Collection<T> findShortestPathBetween(final T a, final T b) {
-			final Node<T> start = snapshot.nodes.get(a);
+			final Node<T> start = snapshot.snapshotNodes.get(a);
 			if (start == null) {
 				return Collections.emptyList();
 			}
@@ -741,7 +741,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 	}
 
-	/** Helper class specialized in sorting the graph's content in topological order */
+	/** Helper class specialized in sorting the graph's nodeContent in topological order */
 	private final class TopologicalSorter {
 		/** Holds a snapshot of a graph node */
 		private final class NodeSnapshot {
@@ -754,11 +754,11 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		private final AtomicBoolean valid = new AtomicBoolean(true);
-		private Map<T, Node<T>> nodes;
+		private Map<T, Node<T>> snapshotNodes;
 		private Map<Node<T>, NodeSnapshot> nodeSnapshots;
 		private SortedSet<Node<T>> sortedVertices;
-		private Integer edges;
-		private Long version;
+		private Integer snapshotEdges;
+		private Long snapshotVersion;
 
 		private TopologicalSorter() {
 			reset();
@@ -766,15 +766,15 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 		private void reset() {
 			readSafely(() -> {
-				version = DependencyGraph.this.version.get();
-				edges = DependencyGraph.this.edges.get();
-				nodes = new HashMap<>(DependencyGraph.this.nodes);
-				nodeSnapshots = nodes.values().stream().collect(Collectors.toMap(Function.identity(), NodeSnapshot::new));
+				snapshotVersion = DependencyGraph.this.version.get();
+				snapshotEdges = DependencyGraph.this.edges.get();
+				snapshotNodes = new HashMap<>(DependencyGraph.this.nodes);
+				nodeSnapshots = snapshotNodes.values().stream().collect(Collectors.toMap(Function.identity(), NodeSnapshot::new));
 				sortedVertices = new TreeSet<>((a, b) -> {
 					final Collection<Node<T>> incomingA = getIncomingNodes(a);
 					final Collection<Node<T>> outgoingA = getOutgoingNodes(a);
 					final Collection<Node<T>> outgoingB = getOutgoingNodes(b);
-					return compareNodes(a.sequence, b.sequence, incomingA.size(), outgoingA.size(), outgoingB.size());
+					return compareNodes(a.nodeSequence, b.nodeSequence, incomingA.size(), outgoingA.size(), outgoingB.size());
 				});
 				sortedVertices.addAll(DependencyGraph.this.vertices);
 			});
@@ -782,7 +782,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		private boolean isNotStale() {
-			return version != null && version.equals(DependencyGraph.this.version.get());
+			return snapshotVersion != null && snapshotVersion.equals(DependencyGraph.this.version.get());
 		}
 
 		private Collection<Node<T>> getIncomingNodes(final Node<T> node) {
@@ -796,18 +796,18 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		private void discard() {
-			version = null;
-			nodes = null;
+			snapshotVersion = null;
+			snapshotNodes = null;
 			sortedVertices = null;
-			edges = null;
+			snapshotEdges = null;
 			nodeSnapshots = null;
 		}
 
 		private List<T> sort() {
 			if (valid.compareAndSet(true, false)) {
 				try {
-					final List<T> result = new ArrayList<>(nodes.size());
-					int edgesLeft = edges;
+					final List<T> result = new ArrayList<>(snapshotNodes.size());
+					int edgesLeft = snapshotEdges;
 
 					Iterator<Node<T>> vertIter = sortedVertices.iterator();
 
@@ -815,7 +815,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 						final Node<T> node = vertIter.next();
 						vertIter.remove();
 
-						result.add(node.content);
+						result.add(node.nodeContent);
 
 						final Iterator<Node<T>> outIter = getOutgoingNodes(node).iterator();
 						while (outIter.hasNext()) {
@@ -859,7 +859,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * <p>This method will perform a topological sorting of its content, based
+	 * <p>This method will perform a topological sorting of its nodeContent, based
 	 * on the algorithm described by Arthur B. Kahn[1962] in article
 	 * "Topological sorting of large networks", Communications of the ACM 5 (11): 558562</p>
 	 *
@@ -874,7 +874,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * during the entire sort operation in order to avoid unpredicted results
 	 * if the graph's contents were to be modified during the sorting.<p>
 	 *
-	 * @return A list containing the content of the graph in topological order.
+	 * @return A list containing the nodeContent of the graph in topological order.
 	 * In other words, since this is a dependency graph, the elements of the list
 	 * will be sorted in a correct and safe order of execution. If the graph is empty,
 	 * then the resulting list will also be empty.
@@ -899,7 +899,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Finds shortest acyclic path between a and b. If cycles are found they will be ignored.
 	 * @param a the starting node
 	 * @param b the target node
-	 * @return A collection containing the nodes representing the shortest acyclic path between a and b.
+	 * @return A collection containing the snapshotNodes representing the shortest acyclic path between a and b.
 	 */
 	public Collection<T> findShortestPathBetween(final T a, final T b) {
 		ensureContentNotNull(a, b);
@@ -918,10 +918,10 @@ public final class DependencyGraph<T> implements Collection<T> {
 		private CycleFinder() {
 		}
 
-		private Collection<Collection<T>> findCycles()
+		Collection<Collection<T>> findCycles()
 		{
 			final Collection<Collection<T>> cycles = new HashSet<>();
-			final Set<Node<T>> candidateCycleRoots = new HashSet<>(snapshot.bidirectionalNodes);
+			final Set<Node<T>> candidateCycleRoots = new HashSet<>(snapshot.snapshotBidiNodes);
 			Iterator<Node<T>> iter = candidateCycleRoots.iterator();
 			while (iter.hasNext()) {
 				try {
@@ -933,31 +933,31 @@ public final class DependencyGraph<T> implements Collection<T> {
 			return Collections.unmodifiableCollection(cycles);
 		}
 
-		private boolean isNotStale() {
+		boolean isNotStale() {
 			return snapshot.isNotStale();
 		}
 
-		private void findCycles(final Node<T> root, final Collection<Collection<T>> cycles,
+		void findCycles(final Node<T> root, final Collection<Collection<T>> cycles,
 								final Set<Node<T>> candidateCycleRoots) {
 			findCycles(root, root, new LinkedHashSet<>(), cycles, candidateCycleRoots);
 		}
 
-		private void findCycles(final Node<T> root, final Node<T> node, final LinkedHashSet<T> currentCycle,
+		void findCycles(final Node<T> root, final Node<T> node, final LinkedHashSet<T> currentCycle,
 								final Collection<Collection<T>> cycles, final Set<Node<T>> candidateCycleRoots)
 		{
 			if (node != root || currentCycle.isEmpty()) {
-				if (currentCycle.contains(node.content)) {
+				if (currentCycle.contains(node.nodeContent)) {
 					return;
 				}
 
-				currentCycle.add(node.content);
+				currentCycle.add(node.nodeContent);
 				snapshot.getOutgoingNodes(node).stream().filter(snapshot::hasOutgoing).forEachOrdered(out -> {
 					if (snapshot.countEdges(out) == 2) {
 						candidateCycleRoots.remove(out);
 					}
 					findCycles(root, out, currentCycle, cycles, candidateCycleRoots);
 				});
-//				currentCycle.remove(node.content);
+//				currentCycle.remove(node.nodeContent);
 			} else {
 				//System.out.println("Found cycle: " + currentCycle);
 				cycles.add(Collections.unmodifiableSet(currentCycle));
@@ -969,7 +969,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Identifies all cycles (circular paths) in the graph, if any.
 	 *
 	 * @return A collection of cycles. If there isn't any, the collection is empty, otherwise it will
-	 * contain 1 or more collections, each one containing the graph nodes that
+	 * contain 1 or more collections, each one containing the graph snapshotNodes that
 	 * participate in a circular dependency path.
 	 */
 	public Collection<Collection<T>> findCycles() {
@@ -1051,7 +1051,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		return threadSafe && lock.isWriteLockedByCurrentThread();
 	}
 
-	/** @throws NullPointerException if any of the content elements is null */
+	/** @throws NullPointerException if any of the nodeContent elements is null */
 	@Override
 	@SuppressWarnings("unchecked")
 	public boolean addAll(final Collection<? extends T> content) {
@@ -1105,7 +1105,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 	/**
 	 * {@inheritDoc}
-	 * <p>The resulting Iterator will navigate all nodes in the graph, in no particular order,
+	 * <p>The resulting Iterator will navigate all snapshotNodes in the graph, in no particular order,
 	 * and it does not support the {@link java.util.Iterator#remove remove} operation.</p>
 	 * @return {@inheritDoc}
 	 */
@@ -1174,11 +1174,11 @@ public final class DependencyGraph<T> implements Collection<T> {
 			}
 		}
 
-		private final Map<T, Node<T>> nodes;
+		private final Map<T, Node<T>> snapshotNodes;
 		private final Map<Node<T>, NodeSnapshot> nodeSnapshots;
-		private final Set<Node<T>> vertices, bidirectionalNodes, dependentFree;
-		private final Integer edges;
-		private final Long version;
+		private final Set<Node<T>> snapshotVertices, snapshotBidiNodes, snapshotDependentFree;
+		private final Integer snapshotEdges;
+		private final Long snapshotVersion;
 
 		/**
 		 * Instantiating this class will immediately take a read-only snapshot of the entire graph.
@@ -1188,33 +1188,33 @@ public final class DependencyGraph<T> implements Collection<T> {
 		private Snapshot() {
 			/** auxiliary data structure to allow multi-object return from lambda */
 			final class Aux {
-				private Map<T, Node<T>> nodes;
-				private Map<Node<T>, NodeSnapshot> nodeSnapshots;
-				private Set<Node<T>> vertices, bidirectionalNodes, dependentFree;
-				private Integer edges;
-				private Long version;
+				private Map<T, Node<T>> _nodes;
+				private Map<Node<T>, NodeSnapshot> _nodeSnapshots;
+				private Set<Node<T>> _vertices, _bidirectionalNodes, _dependentFree;
+				private Integer _edges;
+				private Long _version;
 			}
 			final Aux aux = new Aux();
 			readSafely(() -> {
-				aux.version = DependencyGraph.this.version.get();
-				aux.nodes = Collections.unmodifiableMap(new HashMap<>(DependencyGraph.this.nodes));
-				aux.vertices = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.vertices));
-				aux.bidirectionalNodes = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.bidirectionalNodes));
-				aux.dependentFree = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.dependentFree));
-				aux.edges = DependencyGraph.this.edges.get();
-				aux.nodeSnapshots = aux.nodes.values().stream().collect(Collectors.toMap(Function.identity(), NodeSnapshot::new));
+				aux._version = DependencyGraph.this.version.get();
+				aux._nodes = Collections.unmodifiableMap(new HashMap<>(DependencyGraph.this.nodes));
+				aux._vertices = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.vertices));
+				aux._bidirectionalNodes = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.bidirectionalNodes));
+				aux._dependentFree = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.dependentFree));
+				aux._edges = DependencyGraph.this.edges.get();
+				aux._nodeSnapshots = aux._nodes.values().stream().collect(Collectors.toMap(Function.identity(), NodeSnapshot::new));
 			});
-			this.version = DependencyGraph.this.version.get();
-			this.nodes = Collections.unmodifiableMap(new HashMap<>(DependencyGraph.this.nodes));
-			this.vertices = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.vertices));
-			this.bidirectionalNodes = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.bidirectionalNodes));
-			this.dependentFree = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.dependentFree));
-			this.edges = DependencyGraph.this.edges.get();
-			this.nodeSnapshots = this.nodes.values().stream().collect(Collectors.toMap(Function.identity(), NodeSnapshot::new));
+			this.snapshotVersion = aux._version;
+			this.snapshotNodes = aux._nodes;
+			this.snapshotVertices = aux._vertices;
+			this.snapshotBidiNodes = aux._bidirectionalNodes;
+			this.snapshotDependentFree = aux._dependentFree;
+			this.snapshotEdges = aux._edges;
+			this.nodeSnapshots = aux._nodeSnapshots;
 		}
 
 		private boolean isNotStale() {
-			return version.equals(DependencyGraph.this.version.get());
+			return snapshotVersion.equals(DependencyGraph.this.version.get());
 		}
 
 		private Map<Node<T>, T> getAdjacentsMap(final Node<T> node) {
@@ -1224,8 +1224,8 @@ public final class DependencyGraph<T> implements Collection<T> {
 			}
 			if (nodeSnapshot.adjacents == null) {
 				final Map<Node<T>, T> map = new HashMap<>(nodeSnapshot.inbound.size() + nodeSnapshot.outbound.size());
-				nodeSnapshot.inbound.keySet().stream().collect(() -> map, (m, n) -> m.put(n, n.content), Map::putAll);
-				nodeSnapshot.outbound.keySet().stream().collect(() -> map, (m, n) -> m.put(n, n.content), Map::putAll);
+				nodeSnapshot.inbound.keySet().stream().collect(() -> map, (m, n) -> m.put(n, n.nodeContent), Map::putAll);
+				nodeSnapshot.outbound.keySet().stream().collect(() -> map, (m, n) -> m.put(n, n.nodeContent), Map::putAll);
 				nodeSnapshot.adjacents = Collections.unmodifiableMap(map);
 			}
 			return nodeSnapshot.adjacents;
@@ -1278,15 +1278,15 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Internal representation of a graph's node.</p>
 	 * <p><strong>NOTE:</strong> Internal Nodes should remain internal, thus should never be exposed outside of the graph.</p>
-	 * @param <C> The type of its content
+	 * @param <C> The type of its nodeContent
 	 */
 	private final class Node<C> implements Comparable<Node<C>> {
-		private final C content;
-		private final int sequence;
+		private final C nodeContent;
+		private final int nodeSequence;
 
 		/*
 		 * Since this class was designed to represent dependencies between elements,
-		 * the direction of the relationships between graph nodes will follow the
+		 * the direction of the relationships between graph Nodes will follow the
 		 * topological order. For example:
 		 *
 		 * If A depends on B, then:
@@ -1300,18 +1300,18 @@ public final class DependencyGraph<T> implements Collection<T> {
 		private final WeakHashMap<Node<C>,C> outbound = new WeakHashMap<>();
 
 		/**
-		 * Create a new node with the given content.
+		 * Create a new node with the given nodeContent.
 		 *
 		 * @param content Content to store
-		 * @param sequence The sequence in which the content is being added to
+		 * @param sequence The nodeSequence in which the nodeContent is being added to
 		 * the graph, which will be used as one of the criteria when comparing 2
-		 * nodes in order to respect content addition order when sorting.
+		 * Nodes in order to respect nodeContent addition order when sorting.
 		 */
 		private Node(final C content, final int sequence) {
-			assert content != null : "Each node in a DependencyGraph must have a non-null content";
-			assert sequence >= 0 : "Invalid negative sequence number";
-			this.content = content;
-			this.sequence = sequence;
+			assert content != null : "Each node in a DependencyGraph must have a non-null nodeContent";
+			assert sequence >= 0 : "Invalid negative nodeSequence number";
+			this.nodeContent = content;
+			this.nodeSequence = sequence;
 		}
 
 		/**
@@ -1319,7 +1319,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		 * @param node The origin of the incoming connection
 		 */
 		private boolean addIncoming(final Node<C> node) {
-			return inbound.put(node, node.content) == null;
+			return inbound.put(node, node.nodeContent) == null;
 		}
 
 		/**
@@ -1335,7 +1335,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		 * @param node The target of the outgoing connection
 		 */
 		private boolean addOutgoing(final Node<C> node) {
-			return outbound.put(node, node.content) == null;
+			return outbound.put(node, node.nodeContent) == null;
 		}
 
 		/**
@@ -1373,14 +1373,14 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		/**
-		 * @return The origin nodes of all incoming connections to the current node
+		 * @return The origin Nodes of all incoming connections to the current node
 		 */
 		private Collection<Node<C>> getIncomingNodes() {
 			return inbound.keySet();
 		}
 
 		/**
-		 * @return The target nodes of all outgoing connections from the current node
+		 * @return The target Nodes of all outgoing connections from the current node
 		 */
 		private Collection<Node<C>> getOutgoingNodes()
 		{
@@ -1388,7 +1388,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		/**
-		 * Retrieve the contents of all origin nodes of all incoming connections
+		 * Retrieve the contents of all origin Nodes of all incoming connections
 		 * to the current node.
 		 * @return The contents of all origins of all incoming connections to the current node
 		 */
@@ -1398,7 +1398,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 
 		/**
-		 * Retrieve the contents of all target nodes of all outgoing connections
+		 * Retrieve the contents of all target Nodes of all outgoing connections
 		 * from the current node.
 		 * @return The contents of all targets of all outgoing connections from the current node
 		 */
@@ -1416,7 +1416,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 		/**
 		 * The sum of all incoming and outgoing connections for this node
-		 * @return The total number of edges (or connections) for this node
+		 * @return The total number of Edges (or connections) for this node
 		 */
 		private int countEdges() {
 			return inbound.size() + outbound.size();
@@ -1427,39 +1427,38 @@ public final class DependencyGraph<T> implements Collection<T> {
 		 * rules:</p>
 		 *
 		 * <p>Node A should come before B when</p>
-		 * <ol>
-		 * <li>A has less incoming connections (less dependencies) than B or</li>
-		 * <li>A has more outbound connections (is a dependency to more nodes) than B or</li>
-		 * <li>A's sequence number is minor than B's (A was added to the graph before B)</li>
-		 * </ol>
+		 * <ol><li>A has less incoming connections (less dependencies) than B or</li>
+		 * <li>A has more outbound connections (is a dependency to more Nodes) than B or</li>
+		 * <li>A's nodeSequence number is minor than B's (A was added to the graph before B)</li></ol>
 		 *
 		 * @param node The node to compare the current node with
-		 * @return 0 (zero) if both nodes are actually the same node, negative
+		 * @return 0 (zero) if both Nodes are actually the same node, negative
 		 * if the current node is minor than node or positive if the current node is
 		 * greater than node.
 		 */
+		@Override
 		public int compareTo(final Node<C> node) {
-			return compareNodes(sequence, node.sequence, inbound.size(), outbound.size(), node.outbound.size());
+			return compareNodes(nodeSequence, node.nodeSequence, inbound.size(), outbound.size(), node.outbound.size());
 		}
 
 		/**
 		 * A node is equal to another node if their contents are also equal.
 		 * @param obj the node to compare with
-		 * @return true only if both nodes are considered equal
+		 * @return true only if both Nodes are considered equal
 		 */
 		@Override
 		@SuppressWarnings("unchecked")
 		public boolean equals(final Object obj) {
-			return obj instanceof Node && content.equals(((Node) obj).content);
+			return obj instanceof Node && nodeContent.equals(((Node) obj).nodeContent);
 		}
 
 		/**
-		 * Will return the hash code of the node's content
-		 * @return The content's hash code
+		 * Will return the hash code of the node's nodeContent
+		 * @return The nodeContent's hash code
 		 */
 		@Override
 		public int hashCode() {
-			return content.hashCode();
+			return nodeContent.hashCode();
 		}
 
 		/**
@@ -1468,7 +1467,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		 */
 		@Override
 		public String toString() {
-			return "DependencyGraph.Node : " + content.toString();
+			return "DependencyGraph.Node : " + nodeContent.toString();
 		}
 	}
 
@@ -1482,6 +1481,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 *
 	 * @return a string representation of this collection
 	 */
+	@Override
 	public String toString() {
 		final Iterator<T> it = iterator();
 		if (!it.hasNext()) {
@@ -1502,7 +1502,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * <p>Creates a new instance of {@link FluentBuilder} which can then be used to build a new graph by adding/connecting content.
+	 * <p>Creates a new instance of {@link FluentBuilder} which can then be used to build a new graph by adding/connecting nodeContent.
 	 * For example:</p>
 	 *
 	 * {@code final DependencyGraph<String> graph = DependencyGraph.<String>fluentThreadSafeBuilder().add("A").addConnections("A", "B", "C").addDependencies("B", "C", "D").addConnections("C", "E", "F").build();}
@@ -1525,7 +1525,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 	/**
 	 * <p>Wraps the graph in a new instance of {@link FluentModifier} which can then be used to modify the graph
-	 * by adding/connecting/removing content. For example:</p>
+	 * by adding/connecting/removing nodeContent. For example:</p>
 	 *
 	 * {@code final DependencyGraph<String> graph = new DependencyGraph<>().fluentModifier().addConnections("A", "B", "C").addDependencies("B", "C", "D").remove("F").get();}
 	 *
@@ -1536,7 +1536,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * Internal interface specifying all public content-addition operations allowed on a graph
+	 * Internal interface specifying all public nodeContent-addition operations allowed on a graph
 	 * @param <T> Content type
 	 * @param <F> The concrete {@link AbstractFluent} type implementing this interface
 	 */
@@ -1556,7 +1556,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * Internal interface specifying all public content-removal operations allowed on a graph
+	 * Internal interface specifying all public nodeContent-removal operations allowed on a graph
 	 * @param <T> Content type
 	 * @param <F> The concrete {@link AbstractFluent} type implementing this interface
 	 */
@@ -1655,7 +1655,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * Convenience class to create and configure new {@link DependencyGraph} instances using fluent API.
 	 * Method {@link #build()} should always be the last one in the fluent chain to provide the new graph just built.
-	 * @param <T> The content type for the graph
+	 * @param <T> The nodeContent type for the graph
 	 */
 	public static final class FluentBuilder<T> extends AbstractFluent<T> implements FluentAddOperations<T, FluentBuilder<T>> {
 		private FluentBuilder(final DependencyGraph<T> graph) {
@@ -1726,7 +1726,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Convenience class to modify {@link DependencyGraph} instances using fluent API. Note that this class simply wraps
 	 * the graph instance, hence all its operations will immediately affect the wrapped graph. Method {@link #get()} can
 	 * be optionally called at the end of a call chain to simply return the wrapped graph.
-	 * @param <T> The content type for the graph
+	 * @param <T> The nodeContent type for the graph
 	 */
 	public static final class FluentModifier<T> extends AbstractFluent<T> implements FluentAddOperations<T, FluentModifier<T>>,
 			FluentRemoveOperations<T, FluentModifier<T>> {
