@@ -26,20 +26,44 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+/*
+ * MIT License
+ * Copyright (c) 2016 Eduardo Ribeiro Rodrigues
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ */
+
 /**
  * <p>This class implements a dependency graph using a strongly connected
  * Directed Acyclic Graph (DAG) and allows sorting of its nodes in
  * topological order.</p>
  *
  * <p>Some important characteristics of this class are:</p>
- * <ol><li>Calling {@link #getTopology} will not destroy the graph:
- * the same graph instance can be safely reused after a topological sort operation.</li>
- * <li>It can optionally be instantiated to be thread-safe (see {@link #DependencyGraph(boolean)}).</li>
- * <li>It is capable of detecting cycles (or circular dependencies paths)
- * and for each cycle list all participant nodes (see {@link #findCycles}).</li></ol>
+ * <ol><li>The graph fully implements the {@link Collection} interface</li>
+ * <li>Calling {@link #getTopology} will not destroy the graph: the same graph instance can be safely reused after a topological sort operation.</li>
+ * <li>It can optionally be instantiated to be thread-safe (see {@link #DependencyGraph(boolean)}) adding some overhead due to use of {@link ReentrantReadWriteLock}s</li>
+ * <li>It is capable of detecting cycles (or circular dependencies paths) and for each cycle list all participant nodes (see {@link #findCycles})</li></ol>
  *
  * @param <T> The content type for the graph
+ * @author Eduardo Rodrigues (https://github.com/errodrigues/ez-graph)
  */
+//TODO: implement new method iteratePathsBetween(a, b) returning a standard Iterator where each next entry will be a Collection representing one valid path between nodes a and b
 public final class DependencyGraph<T> implements Collection<T> {
 	private static final Predicate<Object> IS_NULL = o -> o == null;
 
