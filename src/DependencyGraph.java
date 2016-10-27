@@ -1,3 +1,5 @@
+package common.util;
+
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -64,7 +66,7 @@ import java.util.stream.Collectors;
  * @param <T> The nodeContent type for the graph
  */
 @SuppressWarnings("unused")
-//TODO: implement new method iteratePathsBetween(a, b) returning a standard Iterator where each next entry will be a Collection representing one valid path between Nodes a and b
+//TODO: implement new method iteratePathsBetween(a, b) returning a standard Iterator where each next entry will be a Collection representing one valid path between snapshotNodes a and b
 public final class DependencyGraph<T> implements Collection<T> {
 	// stores all snapshotNodes in the graph
 	private final Map<T, Node<T>> nodes = new HashMap<>();
