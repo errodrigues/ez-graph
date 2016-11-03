@@ -1,5 +1,3 @@
-package common.util;
-
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -29,64 +27,44 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
-/*
- * MIT License
- * Copyright (c) 2016 Eduardo Ribeiro Rodrigues
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
- * SOFTWARE.
- */
-
 /**
  * <p>This class implements a dependency graph using a strongly connected
- * Directed Acyclic Graph (DAG) and allows sorting of its snapshotNodes in
+ * Directed Acyclic Graph (DAG) and allows sorting of its Nodes in
  * topological order.</p>
  *
  * <p>Some important characteristics of this class are:</p>
  * <ol><li>The graph fully implements the {@link Collection} interface</li>
  * <li>Calling {@link #getTopology} will not destroy the graph: the same graph instance can be safely reused after a topological sort operation.</li>
  * <li>It can optionally be instantiated to be thread-safe (see {@link #DependencyGraph(boolean)}) adding some overhead due to use of {@link ReentrantReadWriteLock}s</li>
- * <li>It is capable of detecting cycles (or circular dependencies paths) and for each cycle list all participant snapshotNodes (see {@link #findCycles})</li></ol>
+ * <li>It is capable of detecting cycles (or circular dependencies paths) and for each cycle list all participant Nodes (see {@link #findCycles})</li></ol>
  *
  * @param <T> The nodeContent type for the graph
  */
 @SuppressWarnings("unused")
-//TODO: implement new method iteratePathsBetween(a, b) returning a standard Iterator where each next entry will be a Collection representing one valid path between snapshotNodes a and b
+//TODO: implement new method iteratePathsBetween(a, b) returning a standard Iterator where each next entry will be a Collection representing one valid path between Nodes a and b
 public final class DependencyGraph<T> implements Collection<T> {
-	// stores all snapshotNodes in the graph
+	// stores all Nodes in the graph
 	private final Map<T, Node<T>> nodes = new HashMap<>();
 
-	// stores only those snapshotNodes that do not have any incoming connections from
-	// other snapshotNodes.
+	// stores all Nodes in the graph
+	private final Map<T, Object> markedNodes = new HashMap<>();
+
+	// stores only those Nodes that do not have any incoming connections from
+	// other Nodes.
 	private final Set<Node<T>> vertices = new HashSet<>();
 
-	// stores only those snapshotNodes that do not have any outgoing connections to
-	// other snapshotNodes.
+	// stores only those Nodes that do not have any outgoing connections to
+	// other Nodes.
 	private final Set<Node<T>> dependentFree = new HashSet<>();
 
-	// stores only those snapshotNodes that do have at least 1 outgoing AND 1 incoming connection to/from
-	// other snapshotNodes.
+	// stores only those Nodes that do have at least 1 outgoing AND 1 incoming connection to/from
+	// other Nodes.
 	private final Set<Node<T>> bidirectionalNodes = new HashSet<>();
 
 	// keeps count of the total number of snapshotEdges (or connections), in or outbound
 	private final AtomicInteger edges = new AtomicInteger(0);
 
-	// nodeSequence number used when creating new snapshotNodes
+	// nodeSequence number used when creating new Nodes
 	private final AtomicInteger sequence = new AtomicInteger(0);
 	private final AtomicLong version = new AtomicLong(0L);
 
@@ -207,6 +185,97 @@ public final class DependencyGraph<T> implements Collection<T> {
 		return new Node<>(content, sequence.getAndIncrement());
 	}
 
+	/**
+	 * Marks the given content in the graph by associating the given object with it
+	 * @param content The content to be marked
+	 * @param mark The object to associate with the content as its mark
+	 * @return true if the given content is found in the graph and was successfully marked
+	 * @see #mark(Object)
+	 * @see #isMarked(Object)
+	 * @see #unmark(Object)
+	 * @see #unmarkAll()
+	 */
+	public boolean mark(final T content, final Object mark) {
+		ensureContentNotNull(content, mark);
+		if (contains(content)) {
+			mutateSafely(() -> markedNodes.put(content, mark));
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Marks the given content in the graph. This is equivalent to {@link #mark(Object, Object) mark(content, true)}.
+	 * @param content The content to be marked
+	 * @return true if the given content is found in the graph and was successfully marked
+	 * @see #mark(Object, Object)
+	 * @see #isMarked(Object)
+	 * @see #unmark(Object)
+	 * @see #unmarkAll()
+	 */
+	public boolean mark(final T content) {
+		ensureContentNotNull(content);
+		if (contains(content)) {
+			mutateSafely(() -> markedNodes.put(content, true));
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Clears any mark on the given content
+	 * @param content The content to be unmarked
+	 * @return The previous object that was marking the content or null if any
+	 * @see #mark(Object, Object)
+	 * @see #mark(Object)
+	 * @see #isMarked(Object)
+	 * @see #unmarkAll()
+	 */
+	public Object unmark(final T content) {
+		ensureContentNotNull(content);
+		return mutateSafely(() -> markedNodes.remove(content));
+	}
+
+	/**
+	 * Clears all marks on from the graph
+	 * @see #mark(Object, Object)
+	 * @see #mark(Object)
+	 * @see #isMarked(Object)
+	 * @see #unmark(Object)
+	 */
+	public void unmarkAll() {
+		mutateSafely(() -> markedNodes.clear());
+	}
+
+	/**
+	 * Gets the object marking the given content
+	 * @param content The marked content
+	 * @return The object that was marking the content or null if any
+	 * @see #mark(Object, Object)
+	 * @see #mark(Object)
+	 * @see #isMarked(Object)
+	 * @see #unmark(Object)
+	 * @see #unmarkAll()
+	 */
+	public Object getMark(final T content) {
+		ensureContentNotNull(content);
+		return readSafely(() -> markedNodes.get(content));
+	}
+
+	/**
+	 * Indicates if the given content is currently marked in the graph
+	 * @param content The marked content
+	 * @return true if the given content is marked
+	 * @see #mark(Object, Object)
+	 * @see #mark(Object)
+	 * @see #unmark(Object)
+	 * @see #unmarkAll()
+	 */
+	public boolean isMarked(final T content) {
+		ensureContentNotNull(content);
+		return readSafely(() -> markedNodes.containsKey(content));
+	}
+
 	@Override
 	public int size() {
 		return nodes.size();
@@ -218,16 +287,16 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * Identifies all the snapshotNodes that no other snapshotNodes depend on
-	 * @return Collection of snapshotNodes that no other snapshotNodes depend on
+	 * Identifies all the Nodes that no other Nodes depend on
+	 * @return Collection of Nodes that no other Nodes depend on
 	 */
 	public Collection<T> getDependentFreeNodes() {
 		return extractContent(dependentFree);
 	}
 
 	/**
-	 * Identifies all the snapshotNodes that do not depend on any other node
-	 * @return Collection of snapshotNodes that do not depend on any other node
+	 * Identifies all the Nodes that do not depend on any other node
+	 * @return Collection of Nodes that do not depend on any other node
 	 */
 	public Collection<T> getIndependentNodes() {
 		return extractContent(vertices);
@@ -261,11 +330,11 @@ public final class DependencyGraph<T> implements Collection<T> {
 	private void initializeFor(final Node<T> node) {
 		vertices.add(node);
 		assert nodes.size() >= vertices.size() :
-				"The number of sortedVertices should never be greater than total number of snapshotNodes";
+				"The number of sortedVertices should never be greater than total number of Nodes";
 
 		dependentFree.add(node);
 		assert nodes.size() >= dependentFree.size() :
-				"The number of dependent-free snapshotNodes should never be greater than total number of snapshotNodes";
+				"The number of dependent-free Nodes should never be greater than total number of Nodes";
 	}
 
 	/**
@@ -291,6 +360,12 @@ public final class DependencyGraph<T> implements Collection<T> {
 		return addNodeIfAbsent(content);
 	}
 
+	/** @return The instance of the given content currently in the graph or null */
+	public T get(final T content) {
+		final Node<T> node = readSafely(() -> nodes.get(content));
+		return node != null ? node.nodeContent : null;
+	}
+
 	private void ensureContentNotNull(final Object... args) {
 		for (final Object arg : args) {
 			if (arg == null || arg instanceof Collection && ((Collection<?>) arg).stream().anyMatch(Objects::isNull)) {
@@ -303,18 +378,18 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * <p>Adds 1 or more dependencies to the given dependent node.</p>
 	 *
 	 * <p>If the dependent nodeContent or any of the given dependencies don't exist
-	 * as snapshotNodes in the graph, new snapshotNodes will automatically be created and added
+	 * as Nodes in the graph, new Nodes will automatically be created and added
 	 * first.</p>
 	 *
 	 * <p>Because this is a strongly connected digraph,
 	 * each new dependency will represent 2 new snapshotEdges (or connections)
-	 * between 2 snapshotNodes (dependent and dependency). For example, if A depends on B
+	 * between 2 Nodes (dependent and dependency). For example, if A depends on B
 	 * then B will have an outgoing connection to A as well as  A will have an
 	 * incoming connection from B.</p>
 	 *
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies collection
-	 * @param dependencies All snapshotNodes that dependent depends on
+	 * @param dependencies All Nodes that dependent depends on
 	 * @throws NullPointerException if any of the arguments or any of the elements in &quot;dependencies&quot; is null
 	 */
 	public void addDependencies(final T dependent, final Collection<T> dependencies)
@@ -381,7 +456,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Convenience method equivalent to {@link #addConnections(Object, Collection)}</p>
 	 * @param from The node that will be connected to each node provided in the given collection
-	 * @param to All snapshotNodes that <strong>from</strong> will connect to
+	 * @param to All Nodes that <strong>from</strong> will connect to
 	 * @throws NullPointerException if &quot;from&quot; or any of the elements in &quot;to&quot; is null
 	 */
 	@SafeVarargs
@@ -393,15 +468,15 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * <p>Adds 1 or more connections from the given node.</p>
 	 *
 	 * <p>If the origin node or any of its given connections don't exist
-	 * as snapshotNodes in the graph, new snapshotNodes will automatically be created and added
+	 * as Nodes in the graph, new Nodes will automatically be created and added
 	 * first.</p>
 	 *
-	 * <p>Because this is a strongly connected digraph, each new connection will incur 2 new snapshotEdges between both snapshotNodes
+	 * <p>Because this is a strongly connected digraph, each new connection will incur 2 new snapshotEdges between both Nodes
 	 * being connected. For example, if A connects to B then A will have an outgoing connection to A as well as A will
 	 * have an incoming connection from B.</p>
 	 *
 	 * @param from The node that will be connected to each node provided in the given collection
-	 * @param to All snapshotNodes that <strong>from</strong> will connect to
+	 * @param to All Nodes that <strong>from</strong> will connect to
 	 * @throws NullPointerException if any of the arguments or any of the elements in &quot;to&quot; is null
 	 */
 	public void addConnections(final T from, final Collection<T> to) {
@@ -470,7 +545,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * <p>Convenience method, equivalent to {@link #addDependencies(Object, Collection)}</p>
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies array
-	 * @param dependencies Optional list of snapshotNodes that dependent depends on
+	 * @param dependencies Optional list of Nodes that dependent depends on
 	 * @throws NullPointerException if &quot;dependent&quot; or any of the elements in &quot;dependencies&quot; is null
 	 */
 	@SafeVarargs
@@ -482,7 +557,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Convenience method, equivalent to {@link #removeDependencies(Object, Collection)}
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies array
-	 * @param dependencies All snapshotNodes that should be removed as dependencies of
+	 * @param dependencies All Nodes that should be removed as dependencies of
 	 * the dependent node
 	 */
 	@SafeVarargs
@@ -494,7 +569,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Removes 1 or more dependencies from the given dependent node.</p>
 	 *
-	 * <p>Including snapshotNodes in the dependencies collection that are not connected to
+	 * <p>Including Nodes in the dependencies collection that are not connected to
 	 * the dependent node won't have any effect.</p>
 	 *
 	 * <p>See method {@link #addDependencies(Object dependent, Collection)} for more details on some dependency
@@ -502,7 +577,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 *
 	 * @param dependent The node that depends on each node provided in the
 	 * dependencies array
-	 * @param dependencies All snapshotNodes that should be removed as dependencies of
+	 * @param dependencies All Nodes that should be removed as dependencies of
 	 * the dependent node
 	 */
 	public void removeDependencies(final T dependent, final Collection<T> dependencies) {
@@ -546,7 +621,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Convenience method, equivalent to {@link #removeConnections(Object, Collection)}
 	 * @param from The node that connects to each node provided in the
 	 * &quot;to&quot; array
-	 * @param to All snapshotNodes that should be disconnected
+	 * @param to All Nodes that should be disconnected
 	 */
 	@SafeVarargs
 	public final void removeConnections(final T from, final T... to) {
@@ -557,14 +632,14 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/**
 	 * <p>Removes 1 or more connections from the given &quot;from&quot; node.</p>
 	 *
-	 * <p>Including snapshotNodes in the &quot;to&quot; collection that are not connected to
+	 * <p>Including Nodes in the &quot;to&quot; collection that are not connected to
 	 * the &quot;from&quot; node won't have any effect.</p>
 	 *
 	 * <p>See method {@link #addConnections(Object, Collection)} for more details.</p>
 	 *
 	 * @param from The node that connects to each node provided in the
 	 * &quot;to&quot; array
-	 * @param to All snapshotNodes that should be disconnected
+	 * @param to All Nodes that should be disconnected
 	 */
 	public void removeConnections(final T from, final Collection<T> to) {
 		ensureContentNotNull(from, to);
@@ -605,7 +680,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 	/**
 	 * <p>Will remove the node containing the given nodeContent, if it exists in the graph.
-	 * As a result, all snapshotEdges directly connecting this node to other snapshotNodes will
+	 * As a result, all snapshotEdges directly connecting this node to other Nodes will
 	 * also be removed.</p>
 	 *
 	 * @param object The nodeContent to be removed from the graph
@@ -660,7 +735,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * Retrieves the contents of all snapshotNodes that the given nodeContent directly depends on.
+	 * Retrieves the contents of all Nodes that the given nodeContent directly depends on.
 	 *
 	 * @param content The node to retrieve all direct dependencies from
 	 * @return A collection containing all direct dependencies for the given nodeContent.
@@ -677,7 +752,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	/**
-	 * Retrieves the contents of all snapshotNodes that the given nodeContent is a direct
+	 * Retrieves the contents of all Nodes that the given nodeContent is a direct
 	 * dependency of.
 	 *
 	 * @param content The node to retrieve all direct dependents from
@@ -691,7 +766,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		});
 	}
 
-	/** Helper class specialized in find paths between snapshotNodes in the graph */
+	/** Helper class specialized in find paths between Nodes in the graph */
 	private final class PathFinder {
 		private Snapshot snapshot = new Snapshot();
 
@@ -901,7 +976,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Finds shortest acyclic path between a and b. If cycles are found they will be ignored.
 	 * @param a the starting node
 	 * @param b the target node
-	 * @return A collection containing the snapshotNodes representing the shortest acyclic path between a and b.
+	 * @return A collection containing the Nodes representing the shortest acyclic path between a and b.
 	 */
 	public Collection<T> findShortestPathBetween(final T a, final T b) {
 		ensureContentNotNull(a, b);
@@ -971,7 +1046,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * Identifies all cycles (circular paths) in the graph, if any.
 	 *
 	 * @return A collection of cycles. If there isn't any, the collection is empty, otherwise it will
-	 * contain 1 or more collections, each one containing the graph snapshotNodes that
+	 * contain 1 or more collections, each one containing the graph Nodes that
 	 * participate in a circular dependency path.
 	 */
 	public Collection<Collection<T>> findCycles() {
@@ -1107,7 +1182,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 
 	/**
 	 * {@inheritDoc}
-	 * <p>The resulting Iterator will navigate all snapshotNodes in the graph, in no particular order,
+	 * <p>The resulting Iterator will navigate all Nodes in the graph, in no particular order,
 	 * and it does not support the {@link java.util.Iterator#remove remove} operation.</p>
 	 * @return {@inheritDoc}
 	 */
