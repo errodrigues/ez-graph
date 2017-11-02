@@ -51,6 +51,8 @@ import java.util.function.Predicate;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
+import javax.annotation.Nonnull;
+
 /**
  * <p>This class implements a dependency graph using a strongly connected
  * Directed Acyclic Graph (DAG) and allows sorting of its Nodes in
@@ -268,7 +270,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 * @see #unmark(Object)
 	 */
 	public void unmarkAll() {
-		mutateSafely(() -> markedNodes.clear());
+		mutateSafely(markedNodes::clear);
 	}
 
 	/**
@@ -948,6 +950,10 @@ public final class DependencyGraph<T> implements Collection<T> {
 		}
 	}
 
+	/**
+	 * For a detailed description of how 2 Nodes are compared between each other...
+	 * @see DependencyGraph.Node#compareTo(DependencyGraph.Node)
+	 */
 	private static int compareNodes(final int sequenceA, final int sequenceB, final int incomingA, final int outgoingA, final int outgoingB) {
 		int r = incomingA - outgoingB;
 		if (r == 0) {
@@ -1010,6 +1016,10 @@ public final class DependencyGraph<T> implements Collection<T> {
 	/** @return True if, and only if, this graph <strong>does not contain</strong> any cycles (circular dependencies) */
 	public boolean isAcyclic() {
 		return findCycles().isEmpty();
+	}
+
+	private Snapshot takeSnapshot() {
+		return readSafely(Snapshot::new);
 	}
 
 	/** Helper class specialized in finding cycles (or circular dependencies) in the graph */
@@ -1103,7 +1113,9 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 */
 	private void writeLockIfNeeded() {
 		if (threadSafe) {
+			//noinspection ConstantConditions
 			mustLockForReadOnWriteUnlock.set(readUnlockIfNeeded());
+			//noinspection ConstantConditions
 			lock.writeLock().lock();
 		}
 	}
@@ -1114,10 +1126,13 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 */
 	private void writeUnlockIfNeeded() {
 		if (isHoldingWriteLock()) {
+			//noinspection ConstantConditions
 			if (mustLockForReadOnWriteUnlock.get()) {
+				//noinspection ConstantConditions
 				lock.readLock().lock();
 				mustLockForReadOnWriteUnlock.set(Boolean.FALSE);
 			}
+			//noinspection ConstantConditions
 			lock.writeLock().unlock();
 		}
 	}
@@ -1128,6 +1143,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 */
 	private void readLockIfNeeded() {
 		if (threadSafe) {
+			//noinspection ConstantConditions
 			lock.readLock().lock();
 		}
 	}
@@ -1138,6 +1154,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	 */
 	private Boolean readUnlockIfNeeded() {
 		if (isHoldingReadLock()) {
+			//noinspection ConstantConditions
 			lock.readLock().unlock();
 			return Boolean.TRUE;
 		}
@@ -1145,17 +1162,19 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	private boolean isHoldingReadLock() {
+		//noinspection ConstantConditions
 		return threadSafe && lock.getReadHoldCount() > 0;
 	}
 
 	private boolean isHoldingWriteLock() {
+		//noinspection ConstantConditions
 		return threadSafe && lock.isWriteLockedByCurrentThread();
 	}
 
 	/** @throws NullPointerException if any of the nodeContent elements is null */
 	@Override
 	@SuppressWarnings("unchecked")
-	public boolean addAll(final Collection<? extends T> content) {
+	public boolean addAll(@Nonnull final Collection<? extends T> content) {
 		return operateOnAll(content, c -> add((T)c));
 	}
 
@@ -1175,7 +1194,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	@Override
-	public boolean containsAll(final Collection<?> content) {
+	public boolean containsAll(@Nonnull final Collection<?> content) {
 		ensureContentNotNull(content);
 		return readSafely(() -> nodes.keySet().containsAll(content));
 	}
@@ -1216,16 +1235,16 @@ public final class DependencyGraph<T> implements Collection<T> {
 	}
 
 	@Override
-	public boolean removeAll(final Collection<?> content) {
+	public boolean removeAll(@Nonnull final Collection<?> content) {
 		return operateOnAll(content, this::remove);
 	}
 
 	@Override
-	public boolean retainAll(final Collection<?> content) {
+	public boolean retainAll(@Nonnull final Collection<?> content) {
 		return operateOnAll(nodes.keySet(), n -> !content.contains(n) && remove(n));
 	}
 
-	private boolean operateOnAll(final Collection<?> content, final Function<Object, Boolean> operation) {
+	private boolean operateOnAll(@Nonnull final Collection<?> content, final Function<Object, Boolean> operation) {
 		ensureContentNotNull(content);
 		return mutateSafely(() -> {
 			final AtomicBoolean modified = new AtomicBoolean(false);
@@ -1244,14 +1263,15 @@ public final class DependencyGraph<T> implements Collection<T> {
 		return toArray(array);
 	}
 
-	@Override
-	public <E> E[] toArray(final E[] array)
+	@Override @Nonnull
+	public <E> E[] toArray(@Nonnull final E[] array)
 	{
+		//noinspection SuspiciousToArrayCall
 		return readSafely(() -> nodes.keySet().toArray(array));
 	}
 
 	@SafeVarargs
-	private static <T> Collection<T> union(final int capacity, final Collection<T> initial, final Collection<T>... others) {
+	private static <T> Collection<T> union(final int capacity, @Nonnull final Collection<T> initial, final Collection<T>... others) {
 		final Collection<T> union = new HashSet<>(capacity);
 		union.addAll(initial);
 		Arrays.stream(others).forEachOrdered(union::addAll);
@@ -1287,31 +1307,13 @@ public final class DependencyGraph<T> implements Collection<T> {
 		 * excessive memory pressure or unwanted leaks.
 		 */
 		private Snapshot() {
-			/** auxiliary data structure to allow multi-object return from lambda */
-			final class Aux {
-				private Map<T, Node<T>> _nodes;
-				private Map<Node<T>, NodeSnapshot> _nodeSnapshots;
-				private Set<Node<T>> _vertices, _bidirectionalNodes, _dependentFree;
-				private Integer _edges;
-				private Long _version;
-			}
-			final Aux aux = new Aux();
-			readSafely(() -> {
-				aux._version = DependencyGraph.this.version.get();
-				aux._nodes = Collections.unmodifiableMap(new HashMap<>(DependencyGraph.this.nodes));
-				aux._vertices = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.vertices));
-				aux._bidirectionalNodes = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.bidirectionalNodes));
-				aux._dependentFree = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.dependentFree));
-				aux._edges = DependencyGraph.this.edges.get();
-				aux._nodeSnapshots = aux._nodes.values().stream().collect(Collectors.toMap(Function.identity(), NodeSnapshot::new));
-			});
-			this.snapshotVersion = aux._version;
-			this.snapshotNodes = aux._nodes;
-			this.snapshotVertices = aux._vertices;
-			this.snapshotBidiNodes = aux._bidirectionalNodes;
-			this.snapshotDependentFree = aux._dependentFree;
-			this.snapshotEdges = aux._edges;
-			this.nodeSnapshots = aux._nodeSnapshots;
+			this.snapshotVersion  = DependencyGraph.this.version.get();
+			this.snapshotNodes = Collections.unmodifiableMap(new HashMap<>(DependencyGraph.this.nodes));
+			this.snapshotVertices = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.vertices));
+			this.snapshotBidiNodes = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.bidirectionalNodes));
+			this.snapshotDependentFree = Collections.unmodifiableSet(new HashSet<>(DependencyGraph.this.dependentFree));
+			this.snapshotEdges = DependencyGraph.this.edges.get();
+			this.nodeSnapshots = this.snapshotNodes.values().stream().collect(Collectors.toMap(Function.identity(), NodeSnapshot::new));
 		}
 
 		private boolean isNotStale() {
@@ -1538,7 +1540,7 @@ public final class DependencyGraph<T> implements Collection<T> {
 		 * greater than node.
 		 */
 		@Override
-		public int compareTo(final Node<C> node) {
+		public int compareTo(@Nonnull final Node<C> node) {
 			return compareNodes(nodeSequence, node.nodeSequence, inbound.size(), outbound.size(), node.outbound.size());
 		}
 
